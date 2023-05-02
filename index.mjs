@@ -12,21 +12,21 @@ const errorResponse = (code, msg) => {
   return {statusCode: code, body: msg};
 };
 
-const mysqldefCommand = (database_name, filename, options) => {
+const mysqldefCommand = (database_name, filepath, options) => {
   const user = ` -u ${options.username}`;
   const pass = options.password ? ` -p ${options.password}` : '';
   const host = options.host ? ` -h ${options.host}` : '';
   const port = options.port ? ` -P ${options.port}` : '';
 
   const cmdOpts = options.execute ? '' : '--dry-run';
-  const cmd = `${TASK_ROOT}/mysqldef ${user}${pass}${host}${port} ${database_name} ${cmdOpts} < ${TASK_ROOT}/${filename}`;
+  const cmd = `${TASK_ROOT}/mysqldef ${user}${pass}${host}${port} ${database_name} ${cmdOpts} < ${filepath}`;
   return cmd
 };
 
 const ensureRepositoryDirNotExist = async () => {
-  const repStat = await stat('repository');
+  const repStat = await stat('/tmp/repository');
   if (repStat) {
-    const repDel = await rmdir('repository', {recursive: true});
+    const repDel = await rmdir('/tmp/repository', {recursive: true});
     if (!repDel) {
       return false;
     }
@@ -47,16 +47,16 @@ const gitCommand = (repository, branch, deploy_key_name) => {
 const gitClone = async (repository, branch, deploy_key_name) => {
   const cmd = gitCommand(repository, branch, deploy_key_name);
   console.log("cmd:" + cmd);
-  return exec(cmd, {cwd: TASK_ROOT});
+  return exec(cmd, {cwd: '/tmp'});
 };
 
 export const handler = async (event) => {
   const dry_run = ('dry_run' in event) ? !!event['dry_run'] : true;
   const input = event['input'];
 
-  let filename;
+  let filepath;
   if (input instanceof String || typeof input === "string") {
-    filename = input;
+    filepath = `${TASK_ROOT}/${input}`;
   } else if (input instanceof Object) {
     if (input.type === 'github') {
       const repository = input.repository;
@@ -67,7 +67,7 @@ export const handler = async (event) => {
       if (!git) {
         return errorResponse(500, "Failed to clone the repository");
       }
-      filename = `repository/${schema_path}`;
+      filepath = `/tmp/repository/${schema_path}`;
     } else {
       const msg = 'Input needs to be a file path (in this container), or {"type":"github","repository":"owner/repo","schema_path":"db/schema.sql","key_name":"my_ssh_key_name"}';
       return errorResponse(400, msg);
@@ -92,7 +92,7 @@ export const handler = async (event) => {
     password: event['database_password'] || process.env.DATABASE_PASSWORD,
     execute: !dry_run,
   };
-  const cmd = mysqldefCommand(database_name, filename, options);
+  const cmd = mysqldefCommand(database_name, filepath, options);
   const proc = await exec(cmd);
 
   console.log("-------------- stdout --------------\n" + proc.stdout);
