@@ -202,4 +202,4 @@ Steps:
 2. (Add modifications if needed)
 3. Execute `./build.sh` to build the container
 4. Run the container: `docker run -e DATABASE_HOST=host.docker.internal -e DATABASE_PORT=3306  -p 9000:8080 mysqldef-lambda`
-5. Trigger the function: `curl -XPOST "http://localhost:9000/2015-03-31/functions/function/invocations" -d '{"database_name":"deftest","input":{"type":"github","repository":"tagomoris/mysqldef_lambda_container","schema_path":"example/schema.sql","branch":"branch-for-schema-file"}}' | jq .`
+5. Trigger the function: `curl -XPOST "http://localhost:9000/2015-03-31/functions/function/invocations" -d '{"database_name":"deftest","input":{"type":"github","repository":"tagomoris/mysqldef_lambda_package","schema_path":"example/schema.sql","branch":"branch-for-schema-file"}}' | jq .`
