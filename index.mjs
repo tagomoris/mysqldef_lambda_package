@@ -1,7 +1,7 @@
 import util from 'node:util';
 import child_process from 'node:child_process';
 
-import { stat, rmdir } from 'node:fs/promises';
+import { stat, rm } from 'node:fs/promises';
 
 const exec = util.promisify(child_process.exec);
 
@@ -26,7 +26,7 @@ const mysqldefCommand = (database_name, filepath, options) => {
 const ensureRepositoryDirNotExist = async () => {
   const repStat = await stat('/tmp/repository');
   if (repStat) {
-    const repDel = await rmdir('/tmp/repository', {recursive: true});
+    const repDel = await rm('/tmp/repository', {recursive: true});
     if (!repDel) {
       return false;
     }
@@ -46,7 +46,6 @@ const gitCommand = (repository, branch, deploy_key_name) => {
 
 const gitClone = async (repository, branch, deploy_key_name) => {
   const cmd = gitCommand(repository, branch, deploy_key_name);
-  console.log("cmd:" + cmd);
   return exec(cmd, {cwd: '/tmp'});
 };
 
