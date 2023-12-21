@@ -182,11 +182,19 @@ The deploy key name must be specified for private repositories.
 - `DATABASE_USERNAME`
 - `DATABASE_PASSWORD`
 
-## TODOs
+### Secret values
 
-#### Better secrets management
+This function can fetch secret values from AWS Secrets Manager for the database name, host, port, username and password.
 
-The database password and SSH keys can be fetched from AWS Secrets Manager (or any other sources).
+If those values are configured as `secrets_manager:xxxx`, the function will fetch secrets from Secrets Manager and use the fetched values instead of using configured values directly.
+
+Value patterns are:
+
+* `secrets_manager:xxxx` (with single `:`)
+  * `xxxx` should be a key of secret, and fetched string value will be used as value
+* `secrets_manager:xxxx:yyyy` (with double `:`)
+  * `xxxx` should be a key of secret, and value must be a JSON object string
+  * `yyyy` should be an attribute name of the JSON object
 
 ## Development and Testing on localhost
 
