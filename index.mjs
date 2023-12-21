@@ -38,7 +38,7 @@ const gitCommand = (repository, branch, deploy_key_name) => {
   let ssh = "";
   let target = `https://github.com/${repository}.git`
   if (deploy_key_name) {
-    ssh = `GIT_SSH_COMMAND='ssh -i ${TASK_ROOT}/deploy_keys/${deploy_key_name} -o IdentitiesOnly=yes -o StrictHostKeyChecking=no' `;
+    ssh = `GIT_SSH_COMMAND='ssh -i ${TASK_ROOT}/deploy_keys/${deploy_key_name} -F /dev/null -o IdentitiesOnly=yes -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null' `;
     target = `git@github.com:${repository}.git`;
   }
   return `${ssh}git clone --depth=1 --branch ${branch} ${target} repository`;
@@ -63,8 +63,8 @@ export const handler = async (event) => {
       const deploy_key_name = input.key_name || null;
       const schema_path = input.schema_path;
       const git = await gitClone(repository, branch, deploy_key_name);
-      if (!git) {
-        return errorResponse(500, "Failed to clone the repository");
+      if (!git || git.error) {
+        return errorResponse(500, `Failed to clone the repository, error:${git.error}`);
       }
       filepath = `/tmp/repository/${schema_path}`;
     } else {
