@@ -3,9 +3,50 @@ import child_process from 'node:child_process';
 
 import { stat, rm } from 'node:fs/promises';
 
+import {
+  GetSecretValueCommand,
+  SecretsManagerClient,
+} from "@aws-sdk/client-secrets-manager";
+
 const exec = util.promisify(child_process.exec);
 
 const TASK_ROOT = process.env.LAMBDA_TASK_ROOT;
+
+const secretsManagerClient = new SecretsManagerClient();
+
+const secrets = {};
+const getSecret = async (secretName) => {
+  if (secretName in secrets) {
+    return secrets[secretName];
+  }
+  const response = await secretsManagerClient.send(
+    new GetSecretValueCommand({
+      SecretId: secretName,
+    })
+  );
+  const secret = response.SecretString;
+  secrets[secretName] = secret;
+  return secret;
+};
+
+const resolveSecret = async (value) => {
+  // secrets_manager:input_secret_name
+  if (!value) {
+    return value;
+  }
+  if (!value.startsWith('secrets_manager:')) {
+      return value;
+  }
+  const parts = value.substring('secrets_manager:'.length).split(":", 2);
+  const secretName = parts[0];
+  const secret = await getSecret(secretName);
+  if (parts.length < 2) {
+    return secret;
+  }
+  const jsonKey = parts[1];
+  const obj = JSON.parse(secret);
+  return obj[jsonKey];
+};
 
 const errorResponse = (code, msg) => {
   console.log(msg);
@@ -91,24 +132,30 @@ export const handler = async (event) => {
     return errorResponse(400, "No input schema specified.");
   }
 
-  const database_name = event['database_name'] || process.env.DATABASE_NAME;
+  const database_name = await resolveSecret(event['database_name'] || process.env.DATABASE_NAME);
   if (!database_name) {
     return errorResponse(400, "Database name is a mandatory event key(database_name) or environment variable(DATABASE_NAME).");
   }
 
+  const host_name = await resolveSecret(event['database_host'] || process.env.DATABASE_HOST);
+  const port_num = await resolveSecret(event['database_port'] || process.env.DATABASE_PORT);
+  const username = await resolveSecret(event['database_username'] || process.env.DATABASE_USERNAME || 'root');
+  const password = await resolveSecret(event['database_password'] || process.env.DATABASE_PASSWORD);
   const options = {
-    host: event['database_host'] || process.env.DATABASE_HOST,
-    port: event['database_port'] || process.env.DATABASE_PORT,
-    username: event['database_username'] || process.env.DATABASE_USERNAME || 'root',
-    password: event['database_password'] || process.env.DATABASE_PASSWORD,
+    host: host_name,
+    port: port_num,
+    username: username,
+    password: password,
     execute: !dry_run,
   };
   const cmd = mysqldefCommand(database_name, filepath, options);
-  const proc = await exec(cmd);
-
-  console.log("-------------- stdout --------------\n" + proc.stdout);
-  console.log("-------------- stderr --------------\n" + proc.stderr);
-
+  try {
+    const proc = await exec(cmd);
+    console.log("-------------- stdout --------------\n" + proc.stdout);
+    console.log("-------------- stderr --------------\n" + proc.stderr);
+  } catch (error) {
+    console.log("Error: " + error);
+  }
   const response = {
     statusCode: 200,
     body: JSON.stringify('Done'),
