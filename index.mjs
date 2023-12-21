@@ -23,15 +23,26 @@ const mysqldefCommand = (database_name, filepath, options) => {
   return cmd
 };
 
-const ensureRepositoryDirNotExist = async () => {
-  const repStat = await stat('/tmp/repository');
-  if (repStat) {
-    const repDel = await rm('/tmp/repository', {recursive: true});
-    if (!repDel) {
-      return false;
+const repositoryDirExist = async () => {
+  let result = false;
+  try {
+    const repStat = await stat('/tmp/repository');
+    if (repStat) {
+      const repDel = await rm('/tmp/repository', {force: true, recursive: true});
+      if (repDel !== undefined) {
+        console.log({"here":"/tmp/repository exists and cannot be deleted", repDel});
+        result = true;
+      }
+    }
+  } catch (e) {
+    if (e.code === 'ENOENT') {
+      // no problem
+    } else {
+      console.log({"here":"/tmp/repository exists and cannot be deleted", e});
+      result = true;
     }
   }
-  return true;
+  return result;
 };
 
 const gitCommand = (repository, branch, deploy_key_name) => {
@@ -58,6 +69,11 @@ export const handler = async (event) => {
     filepath = `${TASK_ROOT}/${input}`;
   } else if (input instanceof Object) {
     if (input.type === 'github') {
+      const repoExists = await repositoryDirExist();
+      if (repoExists) {
+        return errorResponse(500, "The repository directory is not empty and cannot be deleted.");
+      }
+
       const repository = input.repository;
       const branch = input.branch || 'main';
       const deploy_key_name = input.key_name || null;
@@ -78,10 +94,6 @@ export const handler = async (event) => {
   const database_name = event['database_name'] || process.env.DATABASE_NAME;
   if (!database_name) {
     return errorResponse(400, "Database name is a mandatory event key(database_name) or environment variable(DATABASE_NAME).");
-  }
-
-  if (!ensureRepositoryDirNotExist()) {
-    return errorResponse(500, "The repository directory is not empty and cannot be deleted.");
   }
 
   const options = {
